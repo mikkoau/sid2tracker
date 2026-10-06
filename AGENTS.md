@@ -11,8 +11,9 @@ Contributor rules for this clone. Product docs:
 - Prefer small, focused pull requests with a clear before/after description.
 - Include a failing unit test when the change is behavioral, or explain why a
   synthetic fixture is enough.
-- Do not commit `.sid` files, copyrighted `.it` outputs, or HVSC documents.
-  Quote HVSC paths and tune names instead of attaching files.
+- Do not commit `.sid` files, copyrighted `.it` outputs, HVSC documents, or
+  generated `sid2it/resid_wave_tables.py`. Quote HVSC paths and tune names
+  instead of attaching files. Optional reSID table setup is in the README.
 - Run `python3 -m unittest discover -s tests` before opening a PR.
   Optional: listen in a tracker after dump or writer changes.
 - If the change affects user-facing or agent docs, update them in the same

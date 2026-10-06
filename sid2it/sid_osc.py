@@ -6,17 +6,18 @@ oscillator half of that: it reproduces the accumulator arithmetic of reSID
 (VICE `src/resid/wave.cc`) closely enough that the resulting spectrum matches,
 without emulating the chip cycle by cycle.
 
-Two deliberate simplifications:
+Deliberate simplifications:
 
 - The accumulator advances once per output sample rather than once per chip
   clock, so a sync reset lands on a sample boundary. `oversample` trades speed
   for accuracy where it matters.
-- Combined waveforms are the bitwise AND of the ideal waveforms. Real combining
-  is an analog effect of the shared DAC and differs between 6581 and 8580.
+- Combined tonal waveforms default to the bitwise AND of the ideal shapes.
+  Optional reSID OSC3 tables (6581/8580), generated locally, replace that AND.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from fractions import Fraction
 
 ACC_MASK = 0xFFFFFF
@@ -52,6 +53,30 @@ def snapped_ratio(ratio: float | None, limit: int = MAX_RATIO_DENOMINATOR) -> fl
     return float(Fraction(ratio).limit_denominator(limit))
 
 
+def normalize_chip_model(model: str | None) -> str:
+    """`MOS8580` when the header says so, else `MOS6581`."""
+    if model and str(model).startswith("MOS8580"):
+        return "MOS8580"
+    return "MOS6581"
+
+
+def _load_table_for() -> Callable[[str, str], bytes] | None:
+    """OSC3 tables if generated locally; None keeps bitwise-AND combining."""
+    try:
+        from .resid_wave_tables import table_for
+    except ImportError:
+        return None
+    return table_for
+
+
+table_for = _load_table_for()
+
+
+def combined_wave_tables_loaded() -> bool:
+    """True when the optional reSID OSC3 table module is present."""
+    return table_for is not None
+
+
 def _noise_clocks(previous: int, current: int) -> int:
     """How many bit-19 rises the accumulator passed through this step.
 
@@ -73,6 +98,19 @@ def _noise_value(shift: int) -> int:
     return value * 4095 // 255
 
 
+def _triangle(acc: int, ring_acc: int) -> int:
+    msb = (acc ^ ring_acc) & ACC_MSB
+    return ((~acc if msb else acc) >> 11) & 0xFFF
+
+
+def _saw(acc: int) -> int:
+    return (acc >> 12) & 0xFFF
+
+
+def _pulse(acc: int, pulse_width: int) -> int:
+    return 0xFFF if (acc >> 12) >= pulse_width else 0
+
+
 def render(
     wave_bits: int,
     samples: int,
@@ -85,6 +123,7 @@ def render(
     sync: bool = False,
     ring: bool = False,
     oversample: int = 1,
+    chip_model: str | None = None,
 ) -> list[int]:
     """Render `samples` 12-bit DAC values.
 
@@ -102,6 +141,7 @@ def render(
     sub_step = step // oversample
     modulating = bool(ratio) and (sync or ring)
     mod_step = int(round(sub_step * ratio)) if modulating else 0
+    model = normalize_chip_model(chip_model)
 
     acc = 0
     mod_acc = 0
@@ -128,23 +168,78 @@ def render(
                 shift = ((shift << 1) & 0x7FFFFF) | feedback
             if sync and mod_rising:
                 acc = 0
-            total += _sample(wave_bits, acc, mod_acc if ring else 0, width, shift)
+            total += _sample(
+                wave_bits,
+                acc,
+                mod_acc if ring else 0,
+                width,
+                shift,
+                model,
+            )
         out.append(total // oversample)
     return out
 
 
-def _sample(wave_bits: int, acc: int, ring_acc: int, pulse_width: int, shift: int) -> int:
-    components: list[int] = []
+def _sample(
+    wave_bits: int,
+    acc: int,
+    ring_acc: int,
+    pulse_width: int,
+    shift: int,
+    chip_model: str,
+) -> int:
+    """One 12-bit oscillator sample.
+
+    Single waveforms match reSID. Combined tonal mixes use OSC3 tables when
+    generated locally; otherwise they AND the ideal components.
+    """
+    selector = 0
     if wave_bits & 0x10:
-        # Ring modulation replaces the MSB that folds the triangle, so the
-        # triangle is the only waveform it affects.
-        msb = (acc ^ ring_acc) & ACC_MSB
-        components.append(((~acc if msb else acc) >> 11) & 0xFFF)
+        selector |= 0x1
     if wave_bits & 0x20:
-        components.append((acc >> 12) & 0xFFF)
+        selector |= 0x2
     if wave_bits & 0x40:
-        components.append(0xFFF if (acc >> 12) >= pulse_width else 0)
+        selector |= 0x4
     if wave_bits & 0x80:
+        selector |= 0x8
+
+    if selector == 0x0:
+        return 0
+    if selector == 0x1:
+        return _triangle(acc, ring_acc)
+    if selector == 0x2:
+        return _saw(acc)
+    if selector == 0x4:
+        return _pulse(acc, pulse_width)
+    if selector == 0x8:
+        return _noise_value(shift)
+
+    lookup = table_for
+    if lookup is not None:
+        # Classic reSID: noise plus any other waveform is silent.
+        if selector & 0x8:
+            return 0
+        saw = _saw(acc)
+        tri = _triangle(acc, ring_acc)
+        pulse = _pulse(acc, pulse_width)
+        if selector == 0x3:
+            return lookup(chip_model, "ST")[saw] << 4
+        if selector == 0x5:
+            return (lookup(chip_model, "PT")[tri >> 1] << 4) & pulse
+        if selector == 0x6:
+            return (lookup(chip_model, "PS")[saw] << 4) & pulse
+        if selector == 0x7:
+            return (lookup(chip_model, "PST")[saw] << 4) & pulse
+        return 0
+
+    components: list[int] = []
+    if selector & 0x1:
+        components.append(_triangle(acc, ring_acc))
+    if selector & 0x2:
+        components.append(_saw(acc))
+    if selector & 0x4:
+        components.append(_pulse(acc, pulse_width))
+    if selector & 0x8:
         components.append(_noise_value(shift))
     if not components:
         return 0

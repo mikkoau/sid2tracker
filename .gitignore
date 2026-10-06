@@ -25,6 +25,8 @@ build/
 # local
 out/
 .cursor/
+# Optional reSID OSC3 tables (GPL-2). Generate locally; do not commit.
+sid2it/resid_wave_tables.py
 
 # os
 .DS_Store

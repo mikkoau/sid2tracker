@@ -737,6 +737,7 @@ def _pcm(
     ratio: float | None = None,
     sync: bool = False,
     ring: bool = False,
+    chip_model: str | None = None,
 ) -> tuple[bytes, int]:
     """Render a looping sample of one steady oscillator setting.
 
@@ -760,6 +761,7 @@ def _pcm(
         sync=sync,
         ring=ring,
         oversample=STATIC_OVERSAMPLE,
+        chip_model=chip_model,
     )
     return _dac_pcm(values), C5_SPEED
 
@@ -796,6 +798,7 @@ def _baked_pcm(
     ratio: float | None = None,
     sync: bool = False,
     ring: bool = False,
+    chip_model: str | None = None,
 ) -> tuple[bytes, int, int]:
     """Render a PWM sweep at a reference pitch for tracker transposition.
 
@@ -818,6 +821,7 @@ def _baked_pcm(
         ratio=snapped_ratio(ratio) if modulating else None,
         sync=sync,
         ring=ring,
+        chip_model=chip_model,
     )
     cycle = max(1, min(total, int(round(BAKED_RATE_HZ / max(sid_hz, 1.0)))))
     # midi_to_it_note subtracts 12, so C5Speed needs a 2x factor vs a raw
@@ -991,9 +995,12 @@ def plan_samples(
     instrument's energy-matched static loop.
     """
     plan = SamplePlan()
+    chip_model = ir.sid_model
     base_number: dict[int, int] = {}
     for index, inst in enumerate(ir.instruments):
-        pcm, speed = _pcm(inst.waveform, inst.pulse_width, inst.ctrl)
+        pcm, speed = _pcm(
+            inst.waveform, inst.pulse_width, inst.ctrl, chip_model=chip_model
+        )
         plan.voices.append(Voice(inst.name or f"inst{index + 1}", inst, pcm, speed))
         base_number[inst.id] = len(plan.voices)
     plan.sample_bytes = sum(len(voice.pcm) for voice in plan.voices)
@@ -1057,6 +1064,7 @@ def plan_samples(
                             ratio,
                             inst.sync,
                             inst.ring,
+                            chip_model=chip_model,
                         )
                         number = add(
                             key,
@@ -1083,6 +1091,7 @@ def plan_samples(
                         ratio,
                         inst.sync,
                         inst.ring,
+                        chip_model=chip_model,
                     )
                     kind = "ring" if inst.ring else "sync"
                     # Cheap looping samples stay available without --use-pwm.
@@ -1102,7 +1111,12 @@ def plan_samples(
                 key = ("duty", inst.id, static_pw >> 7)
                 number = variants.get(key)
                 if number is None:
-                    pcm, c5_speed = _pcm(inst.waveform, static_pw, inst.ctrl)
+                    pcm, c5_speed = _pcm(
+                        inst.waveform,
+                        static_pw,
+                        inst.ctrl,
+                        chip_model=chip_model,
+                    )
                     number = add(
                         key,
                         Voice(f"{inst.name[:7]}duty", inst, pcm, c5_speed),

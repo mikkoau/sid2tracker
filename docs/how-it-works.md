@@ -127,7 +127,8 @@ whole instrument of its own.
   ideal 12-bit DAC values in a 256-sample loop, mean-subtracted to model
   the C64 output coupling, so a narrow pulse stays naturally quieter than
   a square. Noise is a 4096-sample run of the SID's 23-bit LFSR. Combined
-  waveforms use a simple AND-logic mix.
+  waveforms use a simple AND-logic mix by default. Optional local reSID
+  tables (see the README) follow the chip's analog combining more closely.
 - **Modulation.** Sync and ring at a steady ratio still loop, just over as
   many carrier cycles as the ratio needs. When a pulse duty is not baked
   (see below), the static loop uses the duty that carries the note's mean
@@ -182,7 +183,9 @@ emulation. File-format skips (MUS, 2SID, digi, and so on) are in
   an IT `Hxy` vibrato effect.
 - **Wide arpeggios.** Cycles wider than the 15 semitones `Jxy` can carry
   collapse toward a local root pitch.
-- **Combined waveforms.** Default is a simple AND-logic mix.
+- **Combined waveforms.** Default is a simple AND-logic mix. Optional local
+  reSID tables (not shipped; see the README) follow 6581/8580 analog
+  combining more closely.
 - **Section repeats.** Only byte-identical packed 64-row patterns share an
   order-list entry. A trailing copy of the opening notes from an HVSC
   length overrun past a return-to-start loop is trimmed before `B00`.

@@ -54,6 +54,28 @@ python3 -m sid2it path/to/tune.sid --all
 Run from the clone root so the packages resolve on `PYTHONPATH` (the current
 directory is enough).
 
+### Combined-wave tables (optional)
+
+By default this converter mixes combined waveforms (triangle+pulse,
+saw+triangle, and so on) with simple AND-logic on the ideal shapes. The real 6581/8580 sound,
+as in SIDPlay, is richer than that.
+
+[reSID](https://github.com/libsidplayfp/resid)'s OSC3 sample tables get
+closer to the chip. They are
+[GPL-2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html), so they
+are not shipped here. This project stays
+[MIT](https://choosealicense.com/licenses/mit/). Only the tables you generate
+locally remain GPL-2 and stay on your machine.
+
+```bash
+git clone https://github.com/libsidplayfp/resid.git ../resid
+python3 tools/extract_resid_wave_tables.py
+```
+
+Run from the sid2tracker clone root so `../resid` is the sibling tree.
+Then convert as usual. Without the extract step, combined waves stay on
+the simple default mix.
+
 ## Quick start
 
 ```bash
@@ -141,4 +163,5 @@ python3 -m unittest discover -s tests
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[MIT](https://choosealicense.com/licenses/mit/). Optional generated OSC3
+tables stay GPL-2 (reSID / Dag Lem) and local.

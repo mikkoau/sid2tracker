@@ -4,8 +4,15 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from sid2it.sid_osc import ACC_MASK, ratio_cycles, render, snapped_ratio
+from sid2it.sid_osc import (
+    ACC_MASK,
+    combined_wave_tables_loaded,
+    ratio_cycles,
+    render,
+    snapped_ratio,
+)
 
 FULL_CYCLE = ACC_MASK + 1
 
@@ -42,10 +49,60 @@ class WaveformShapeTests(unittest.TestCase):
         self.assertTrue(all(value == 0xFFF for value in values))
 
     def test_combined_waveform_is_the_bitwise_and(self) -> None:
+        with patch("sid2it.sid_osc.table_for", None):
+            saw = render(0x20, 32, step_for(1, 32))
+            triangle = render(0x10, 32, step_for(1, 32))
+            both = render(0x30, 32, step_for(1, 32))
+        self.assertEqual(both, [a & b for a, b in zip(triangle, saw)])
+
+    def test_combined_waveform_uses_resid_osc3_tables(self) -> None:
+        if not combined_wave_tables_loaded():
+            self.skipTest("optional reSID OSC3 tables not generated")
+        from sid2it.resid_wave_tables import table_for
+
+        both = render(0x30, 32, step_for(1, 32), chip_model="MOS6581")
+        expected = []
+        acc = 0
+        step = step_for(1, 32)
+        table = table_for("MOS6581", "ST")
+        for _ in range(32):
+            acc = (acc + step) & ACC_MASK
+            expected.append(table[acc >> 12] << 4)
+        self.assertEqual(both, expected)
         saw = render(0x20, 32, step_for(1, 32))
         triangle = render(0x10, 32, step_for(1, 32))
-        both = render(0x30, 32, step_for(1, 32))
-        self.assertEqual(both, [a & b for a, b in zip(triangle, saw)])
+        self.assertNotEqual(both, [a & b for a, b in zip(triangle, saw)])
+
+    def test_pulse_triangle_masks_table_with_pulse(self) -> None:
+        if not combined_wave_tables_loaded():
+            self.skipTest("optional reSID OSC3 tables not generated")
+        from sid2it.resid_wave_tables import table_for
+
+        pw = 256
+        values = render(
+            0x50, 64, step_for(1, 64), pulse_width=pw, chip_model="MOS6581"
+        )
+        table = table_for("MOS6581", "PT")
+        acc = 0
+        step = step_for(1, 64)
+        for index in range(64):
+            acc = (acc + step) & ACC_MASK
+            tri = ((~acc if acc & 0x800000 else acc) >> 11) & 0xFFF
+            pulse = 0xFFF if (acc >> 12) >= pw else 0
+            self.assertEqual(values[index], (table[tri >> 1] << 4) & pulse)
+
+    def test_noise_plus_tone_is_silent_with_resid_tables(self) -> None:
+        if not combined_wave_tables_loaded():
+            self.skipTest("optional reSID OSC3 tables not generated")
+        values = render(0x90, 32, step_for(1, 32))
+        self.assertTrue(all(value == 0 for value in values))
+
+    def test_6581_and_8580_combined_tables_differ(self) -> None:
+        if not combined_wave_tables_loaded():
+            self.skipTest("optional reSID OSC3 tables not generated")
+        a = render(0x50, 64, step_for(1, 64), pulse_width=2048, chip_model="MOS6581")
+        b = render(0x50, 64, step_for(1, 64), pulse_width=2048, chip_model="MOS8580")
+        self.assertNotEqual(a, b)
 
 class SyncTests(unittest.TestCase):
     def test_sync_resets_the_carrier_on_the_modulator_msb_rise(self) -> None:
