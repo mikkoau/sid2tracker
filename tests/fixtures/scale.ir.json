@@ -1,0 +1,66 @@
+{
+  "format": "c64-music-ir",
+  "version": 1,
+  "title": "IR scale fixture",
+  "source": { "kind": "fixture", "file": null, "subtune": 1 },
+  "timing": { "clock": "PAL", "frame_hz": 50.125, "ticks_per_row": 6 },
+  "instruments": [
+    {
+      "id": 1,
+      "name": "pulse50",
+      "waveform": "pulse",
+      "pulse_width": 2048,
+      "attack": 0,
+      "decay": 9,
+      "sustain": 12,
+      "release": 4,
+      "filtered": false
+    },
+    {
+      "id": 2,
+      "name": "bass",
+      "waveform": "triangle",
+      "pulse_width": 2048,
+      "attack": 0,
+      "decay": 8,
+      "sustain": 10,
+      "release": 6,
+      "filtered": false
+    }
+  ],
+  "channels": [
+    {
+      "id": 0,
+      "name": "lead",
+      "events": [
+        { "tick": 0,  "type": "note_on",  "note": 60, "instrument": 1 },
+        { "tick": 12, "type": "note_off" },
+        { "tick": 12, "type": "note_on",  "note": 62, "instrument": 1 },
+        { "tick": 24, "type": "note_off" },
+        { "tick": 24, "type": "note_on",  "note": 64, "instrument": 1 },
+        { "tick": 36, "type": "note_off" },
+        { "tick": 36, "type": "note_on",  "note": 65, "instrument": 1 },
+        { "tick": 48, "type": "note_off" },
+        { "tick": 48, "type": "note_on",  "note": 67, "instrument": 1 },
+        { "tick": 60, "type": "note_off" },
+        { "tick": 60, "type": "note_on",  "note": 69, "instrument": 1 },
+        { "tick": 72, "type": "note_off" },
+        { "tick": 72, "type": "note_on",  "note": 71, "instrument": 1 },
+        { "tick": 84, "type": "note_off" },
+        { "tick": 84, "type": "note_on",  "note": 72, "instrument": 1, "arpeggio": [0, 4, 7] },
+        { "tick": 108, "type": "note_off" }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "bass",
+      "events": [
+        { "tick": 0,  "type": "note_on",  "note": 48, "instrument": 2 },
+        { "tick": 48, "type": "note_off" },
+        { "tick": 48, "type": "note_on",  "note": 43, "instrument": 2 },
+        { "tick": 108, "type": "note_off" }
+      ]
+    }
+  ],
+  "filter": []
+}

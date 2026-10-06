@@ -1,0 +1,31 @@
+# C64 dumps
+*.sid
+*.prg
+*.d64
+*.d71
+*.d81
+*.mus
+
+# tracker modules
+*.it
+*.xm
+*.s3m
+*.mod
+
+# python
+__pycache__/
+.venv/
+venv/
+
+# packaging
+dist/
+build/
+*.egg-info/
+
+# local
+out/
+.cursor/
+
+# os
+.DS_Store
+Thumbs.db
